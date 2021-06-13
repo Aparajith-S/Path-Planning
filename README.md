@@ -3,6 +3,9 @@
 ##### Author: Aparajith Sridharan
 ##### Date : 13.06.2021
 ---
+Builds for ARMv8 and AMD64 on ubuntu 20.04  
+![build](https://travis-ci.org/Aparajith-S/Path-Planning.svg?branch=master)  
+
 ### Goals
 In this project the goal is to safely navigate around a virtual highway with other traffic that is driving +/-10 MPH of the 50 MPH speed limit. 
 You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. 
