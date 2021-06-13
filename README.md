@@ -9,6 +9,10 @@ You will be provided the car's localization and sensor fusion data, there is als
 The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. 
 Also the car should not experience total acceleration over 10 m/s^2^ and jerk that is greater than 10 m/s^3^.
 
+[result]: ./doc/result.gif "output"
+#### Summary
+![output][result]
+
 ### Simulator
 The Term3 Simulator can be downloaded which contains the Path Planning Project from the [releases tab](#https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).  
 
@@ -181,7 +185,7 @@ The corner stone of the trajectory generator is the `Cost` class. the `Cost` cla
 - **function**  a function(t) class that computes N derivatives of the given polynomial coefficients.
 - **Rectangle** a class which implements SAT (separating axis theorem) to find overlapping objects to compute collision on predictions of object positions and generated trajectories to compute collision cost.
  
-### Putting it all together
+### Integrating it all together
 After a trajectory is selected. the path planner returns this trajectory so that the simulator vehicle can act.
 In order to account for the simulator latency, 5 previous points from the trajectory are reused.
 

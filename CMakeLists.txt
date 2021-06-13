@@ -7,13 +7,14 @@ add_definitions(-std=c++11)
 set(CXX_FLAGS "-Wall")
 set(CMAKE_CXX_FLAGS, "${CXX_FLAGS}")
 
-set(sources src/main.cpp)
+set(sources src/path_planner.cpp src/map.cpp src/cost.cpp src/trajectory.cpp src/sceneObjects.cpp src/main.cpp)
 
-
+#src/sceneObjects.cpp 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") 
 
 include_directories(/usr/local/include)
 include_directories(/usr/local/opt/openssl/include)
+include_directories(src/)
 link_directories(/usr/local/lib)
 link_directories(/usr/local/opt/openssl/lib)
 link_directories(/usr/local/Cellar/libuv/1.11.0/lib)
