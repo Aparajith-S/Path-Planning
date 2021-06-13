@@ -1,209 +1,146 @@
-/// \file
-/// \brief
+/// \file sceneObjects.h
+/// \brief scene object class with prediction and ttc/ ttd calculations
 /// \author s.aparajith@live.com
+/// \date 30.05.2021
 /// \copyright None reserved. MIT license
-/// 
-/// 
 #ifndef SCENE_OBJECTS_H
 #define SCENE_OBJECTS_H
 #include "interface.h"
-#include "trajectory.hpp"
-#include "polyfunction.hpp"
+#include "types.h"
 #include"constants.h"
-#include <limits>
 #include <cstdint>
-#include<algorithm>
-#include<optional>
+#include <map>
+#include <vector>
 namespace path_planner {
 namespace scene {
-struct objectState 
-{
-    double value;
-    double value_dot;
-    double value_ddot;
-};
-
-struct object
-{
-    std::uint8_t obj_id; // assuming <=255 objects
-    double obj_x;
-    double obj_y;
-    double obj_Vx;
-    double obj_Vy;
-    double obj_s;
-    double obj_d;
-};
-
-struct FrenetState
-{
-    std::uint8_t id;
-    objectState obj_s;
-    objectState obj_d;
-};
 
 class objects
 {
 public:
-    explicit objects(interfaces::SnsFusionData& i_sensFusionData):
-        m_DataRef(i_sensFusionData)
+    explicit objects(interfaces::SnsFusionData const & i_sensFusionData):
+        m_DataRef(i_sensFusionData),
+        m_FrontRelevantObjects(3U,255U),
+        m_RearRelevantObjects(3U,255U),
+        m_predictions(),
+        m_distFrontVeh(0),
+        m_velFrontVeh(0),
+        m_laneParam(0.0,0.0),
+        m_ProximityFront(std::numeric_limits<double>::max()),
+        m_TTC(std::numeric_limits<double>::max()),
+        m_TTD(0.0),
+        m_TStop(0.0),
+        m_safe_proximity(params::kSafeProximity),
+        m_emergency_proximity(),
+        m_DistfrontMin(3U,std::numeric_limits<double>::max()),
+        m_DistrearMin(3U,std::numeric_limits<double>::max()),
+        m_SpeedFront(3U,params::kMaxHwySpeedLimit),
+        m_SpeedRear(3U,params::kMaxHwySpeedLimit),
+        m_frontLCSafeProximity(3U,params::kSafeProximityLC),
+        m_rearLCSafeProximity(3U,params::kSafeProximityLC),
+        m_cyclicCounter(-1)
     {}
     virtual ~objects() {}
 
-    std::vector<double> computeFutureState(double time,const FrenetState & objData) const
-    {
-        std::vector<double> in_state;
-        auto s_0 = objData.obj_s.value;
-        auto s_1 = objData.obj_s.value_dot;
-        auto s_2 = objData.obj_s.value_ddot;
-
-        auto d_0 = objData.obj_d.value;
-        auto d_1 = objData.obj_d.value_dot;
-        auto d_2 = objData.obj_d.value_ddot;
-
-        in_state.push_back((s_0 + (s_1 * time) + (s_2 * time * time / 2.0)));
-        in_state.push_back(s_1 + (s_2 * time));
-        in_state.push_back(s_2);
-        in_state.push_back(d_0 + (d_1 * time) + (d_2 * time * time / 2.0));
-        in_state.push_back(d_1 + d_2 * time);
-        in_state.push_back( d_2);
-        return in_state;
-    }
- 
-    double calcClosestApproachAnyObject(const trajectory & i_traj)const  
-    {
-        double closest = std::numeric_limits<double>::max();
-        for (const auto& v : m_currentData)
-        {
-            double dist = calcClosestApproach(i_traj, v);
-            if (dist < closest)
-            {
-                closest = dist;
-            }
-        }
-        return closest;
-    }
-
-    std::pair<const FrenetState&,bool> getTargetObject(const std::uint8_t id) const 
-    {
-        bool found = false;
-        auto iter = std::find_if(m_currentData.begin(),
-                                 m_currentData.end(),
-                                 [id](const FrenetState& match)
-        {return (match.id == id); });
-        if (iter != m_currentData.end())
-        {
-            found = true;
-            return (std::make_pair(*iter, found));
-        }
-        else
-        {
-            return (std::make_pair(*(m_currentData.end() - 1), found));
-        }
-
-    }
+    /// @brief get private prediction data 
+    /// @return map data containing prediction coordinates
+    std::map<std::uint8_t,std::vector<vector2d>> getPredictions()const;
     
-    double calcClosestApproach(const trajectory& i_traj,const FrenetState& objData)const
-    {
-        double closest = std::numeric_limits<double>::max();
-        function f_d; 
-        function f_s;
-        f_d.constructEquation(i_traj.traj_d);
-        f_s.constructEquation(i_traj.traj_s);
-        for (int i = 0; i < 100; i++)
-        {
-            double t = float(i) / 100 * i_traj.traj_T;
-            auto cur_s = f_s(t);
-            auto cur_d = f_d(t);
-            auto state_in = computeFutureState(t, objData);
-            double targ_s = state_in[0];
-            double targ_d = state_in[3];
-            double dist = sqrt(pow((cur_s - targ_s),2) + pow((cur_d - targ_d),2));
-            if (dist < closest)
-            {
-                closest = dist;
-            }
-        }
-        return closest;
-    }
+    /// @brief gets safe proximity on the front in the ego lane.
+    /// @details updates the TTC and TTD as well
+    /// @return safe proximity in ego lane in [m].
+    double getSafeProximity()const{return m_safe_proximity;};
     
-    object structurizeData(const interfaces::rawObjData& i_rawObj)
-    {
-        object objData{ i_rawObj[0],
-        i_rawObj[1],
-        i_rawObj[2],
-        i_rawObj[3],
-        i_rawObj[4],
-        i_rawObj[5],
-        i_rawObj[6]};
-        return objData;
-    }
-
-    // take care to match id and fill values.
-    void computeCurrentState(FrenetState& current, const FrenetState& prev)
-    {
-        current.obj_s.value_dot = (current.obj_s.value-prev.obj_s.value)/params::dT;
-        current.obj_s.value_ddot = (current.obj_s.value_dot-prev.obj_s.value_dot)/params::dT;
-    }
-
-    void update() 
-    {
-        m_prevData = m_currentData;
-    }
-
-    void refresh()
-    {
-        m_currentData = std::vector<FrenetState>();
-        FrenetState state;
-        for (const auto& rawObj : m_DataRef.raw_sensor_fusion)
-        {
-            auto StData = structurizeData(rawObj);
-            state.id = StData.obj_id;
-            state.obj_s.value = StData.obj_s;
-            state.obj_d.value = StData.obj_d;
-            m_currentData.push_back(state);
-        }
-        computeObjectState();
-    }
+    /// @brief gets the bumper to bumper distance to the close front vehicle in the given lane number
+    /// @param [in] lane lane id {0: left, 1: center, 2: right}
+    /// @return distance to the front closest vehicle in the requested lane
+    double getSafeDistanceFront(uint8_t lane){return m_DistfrontMin[lane];}
     
-    void computeObjectState()
-    {
-        //ascending order of ID in the json file. so using this property we update the dot and ddot of s and d. 
-        auto curriter = m_currentData.begin();
-        auto previter = m_prevData.begin();
-        while((previter != m_prevData.end()) && (curriter != m_currentData.end()))
-        {
-            if (curriter->id== previter->id)
-            {
-                computeCurrentState(*curriter, *previter);
-                ++curriter;
-                ++previter;
-            }
-            else if (curriter->id < previter->id)
-            {
-                curriter->obj_s.value_ddot = 0.0;
-                curriter->obj_s.value_dot = 0.0;
-                curriter->obj_d.value_dot = 0.0;
-                curriter->obj_d.value_ddot = 0.0;
-                ++curriter;
-            }
-            else 
-            {
-                previter = m_prevData.erase(previter);
-            }
-        }
-
-        while (previter != m_prevData.end())
-        {
-            //remove all old vehicles.
-            previter = m_prevData.erase(previter);
-        }
-    }
-
+    /// @brief gets the bumper to bumper distance to the close rear vehicle in the given lane number
+    /// @param [in] lane lane id {0: left, 1: center, 2: right}
+    /// @return distance to the rear closest vehicle in the requested lane
+    double getSafeDistanceRear(uint8_t lane){return m_DistrearMin[lane];}
+    
+    /// @brief gets Emergency Proximity data
+    /// @return emergency distance computation in meters
+    double getEmergencyProximity()const{return m_emergency_proximity;};
+    
+    /// @brief computes proximities based on \p i_data
+    /// @param [in] i_data : input vehicle data
+    void computeSafeProximities(interfaces::EgoData const & i_data);
+    
+    /// @brief predicts the future trajectories of the vehicles surrounding the ego.
+    /// @param [in] i_predictionHorizon : how many points to predict in the future?
+    void predict(int i_predictionHorizon=params::kMaxPoints);
+    
+    /// @brief refreshes internal data 
+    /// @details excludes vehicles outside the prediction horizon read from \p snsdata
+    /// @param [in] snsdata : sensor fusion data 
+    /// @param [in] i_egoData : input car data
+    void refreshData(interfaces::SnsFusionData const & snsdata,interfaces::EgoData const & i_egoData );
+    
+    /// @brief gets the safe lane speed in the \p i_lane lane
+    /// @param [in] i_lane lane number
+    /// @return safe lane speed in miles/h
+    double getSafeLaneSpeed(std::uint8_t i_lane) const;
+    
+    /// @brief gets the free space in the \p i_lane lane
+    /// @param [in] i_lane lane number
+    /// @return gets free space in meters
+    double getLaneFreeSpace(std::uint8_t i_lane) const;
+    
+    /// @brief sets the safe lane speed and free space in the \p i_lane lane
+    /// @param [in] i_lane lane number
+    void setLaneParams(interfaces::EgoData const &i_data);
+    
+    /// @brief log to file
+    /// @details logs the input object and processed objects
+    /// @param [in] i_input : input interface to the path planner
+    /// @param [in] cyclecount : cycle count of the planner
+    /// @return
+    void log_objs_to_file(interfaces::input const& i_input,int cyclecount);
 
 private:
-    interfaces::SnsFusionData & m_DataRef;
-    std::vector<FrenetState> m_currentData;
-    std::vector<FrenetState> m_prevData;
+    /// @brief computes the safe proximity given the \p i_frontVel and \p i_rearVel velocity 
+    /// @details uses the \p i_time as an extra reaction time and computes the 
+    /// @param [in] i_rearVel : rear vehicle velocity in m/s
+    /// @param [in] i_frontVel : front vehicle velocity in m/s
+    /// @param [in] i_time : extra reaction time in s
+    /// @return proximity in meters
+    double computeSafeProximity(double i_rearVel, double i_frontVel, double i_time);
+    
+    /// @brief computes the velocity of the object at the \p i_indx in the sensor fusion array
+    /// @param [in] i_indx : index of the record in sensor fusion array
+    /// @return object velocity
+    double getObjectVelocity(std::uint8_t i_indx, double default_vel);
+    
+    /// @brief structurizes the data for easier use
+    /// @param [in] i_rawObj the raw sensor fusion data
+    /// @return object : data structure structurizing the object information
+    object structurizeData(const interfaces::rawObjData& i_rawObj);
+    interfaces::SnsFusionData m_DataRef;
+    std::vector<std::uint8_t> m_FrontRelevantObjects;
+    std::vector<std::uint8_t> m_RearRelevantObjects;
+    std::map<std::uint8_t,std::vector<vector2d>> m_predictions;
+    double m_distFrontVeh;
+    double m_velFrontVeh;
+    laneParameters m_laneParam;
+    //predict TTC and TTD params
+    double m_EgoSpeed;
+    double m_EgoAllowedDecel;
+    //proximities and time
+    double m_ProximityFront;
+    double m_TTC; // time to collision
+    double m_TTD; // time to decelerate
+    double m_TStop;
+    double m_safe_proximity;
+    double m_emergency_proximity;
+    std::vector<double> m_DistfrontMin;
+    std::vector<double> m_DistrearMin;
+    std::vector<double> m_SpeedFront;
+    std::vector<double> m_SpeedRear;
+    std::vector<double> m_frontLCSafeProximity;
+    std::vector<double> m_rearLCSafeProximity;
+    int m_cyclicCounter;
 };
 }
 }
