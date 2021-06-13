@@ -1,0 +1,35 @@
+language: cpp
+#ubuntu 20.04
+dist: focal
+addons:
+  apt:
+    sources:
+    # add PPAs with more up-to-date toolchains
+    - ubuntu-toolchain-r-test
+    - llvm-toolchain-precise
+    packages:
+    # install toolchains
+    - gcc
+    - g++
+jobs:
+  include:
+    - os: linux
+      arch: arm64
+      env: OS=arm64_linux
+    - os: linux
+      arch: amd64
+      env: OS=amd64_linux
+      before_install:
+        - sudo apt-get update
+        - sudo apt-get install cmake
+        - sudo apt-get install openssl
+        - sudo apt-get install libssl-dev
+
+script:
+  - if [ -e /usr/lib/libuWs.so ];then
+    sudo rm /usr/lib/libuWs.so;
+    fi
+  - sh ./install-ubuntu.sh
+  - mkdir build
+  - cd build
+  - cmake .. && make
