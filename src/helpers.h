@@ -1,47 +1,39 @@
 #ifndef HELPERS_H
 #define HELPERS_H
-
-#include <math.h>
+#include"constants.h"
+#include <cmath>
 #include <string>
 #include <vector>
 
 // for convenience
-using std::string;
-using std::vector;
-
-// Checks if the SocketIO event has JSON data.
-// If there is data the JSON object in string format will be returned,
-//   else the empty string "" will be returned.
-string hasData(string s) {
-  auto found_null = s.find("null");
-  auto b1 = s.find_first_of("[");
-  auto b2 = s.find_first_of("}");
-  if (found_null != string::npos) {
-    return "";
-  } else if (b1 != string::npos && b2 != string::npos) {
-    return s.substr(b1, b2 - b1 + 2);
-  }
-  return "";
-}
-
-//
+namespace helper{
 // Helper functions related to waypoints and converting from XY to Frenet
 //   or vice versa
 //
-
+#ifndef M_PI
+#define M_PI (3.14159)
+#endif 
 // For converting back and forth between radians and degrees.
-constexpr double pi() { return M_PI; }
-double deg2rad(double x) { return x * pi() / 180; }
-double rad2deg(double x) { return x * 180 / pi(); }
+static constexpr double pi() { return M_PI; }
+static double deg2rad(double x) { return x * pi() / 180.0; }
+static double rad2deg(double x) { return x * 180.0 / pi(); }
 
 // Calculate distance between two points
-double distance(double x1, double y1, double x2, double y2) {
+static double distance(double x1, double y1, double x2, double y2) {
   return sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 }
 
+static std::uint8_t getLane(const double i_Frenet_d){		return std::uint8_t(i_Frenet_d/4);}
+static double mph2ms(const double mph){		return mph * 0.44704;}
+static double ms2mph(const double ms){		return ms / 0.44704;}
+static double getFrenetDfromLane(const std::uint8_t lane) 
+{
+		return ((double)lane+0.5)*params::kLaneWidth;
+}
+	
 // Calculate closest waypoint to current x, y position
-int ClosestWaypoint(double x, double y, const vector<double> &maps_x, 
-                    const vector<double> &maps_y) {
+static int ClosestWaypoint(double x, double y, const std::vector<double> &maps_x, 
+                    const std::vector<double> &maps_y) {
   double closestLen = 100000; //large number
   int closestWaypoint = 0;
 
@@ -59,8 +51,8 @@ int ClosestWaypoint(double x, double y, const vector<double> &maps_x,
 }
 
 // Returns next waypoint of the closest waypoint
-int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x, 
-                 const vector<double> &maps_y) {
+static int NextWaypoint(double x, double y, double theta, const std::vector<double> &maps_x, 
+                 const std::vector<double> &maps_y) {
   int closestWaypoint = ClosestWaypoint(x,y,maps_x,maps_y);
 
   double map_x = maps_x[closestWaypoint];
@@ -82,9 +74,9 @@ int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x,
 }
 
 // Transform from Cartesian x,y coordinates to Frenet s,d coordinates
-vector<double> getFrenet(double x, double y, double theta, 
-                         const vector<double> &maps_x, 
-                         const vector<double> &maps_y) {
+static std::vector<double> getFrenet(double x, double y, double theta, 
+                         const std::vector<double> &maps_x, 
+                         const std::vector<double> &maps_y) {
   int next_wp = NextWaypoint(x,y, theta, maps_x,maps_y);
 
   int prev_wp;
@@ -127,9 +119,9 @@ vector<double> getFrenet(double x, double y, double theta,
 }
 
 // Transform from Frenet s,d coordinates to Cartesian x,y
-vector<double> getXY(double s, double d, const vector<double> &maps_s, 
-                     const vector<double> &maps_x, 
-                     const vector<double> &maps_y) {
+static std::vector<double> getXY(double s, double d, const std::vector<double> &maps_s, 
+                     const std::vector<double> &maps_x, 
+                     const std::vector<double> &maps_y) {
   int prev_wp = -1;
 
   while (s > maps_s[prev_wp+1] && (prev_wp < (int)(maps_s.size()-1))) {
@@ -152,5 +144,31 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s,
   double y = seg_y + d*sin(perp_heading);
 
   return {x,y};
+}
+
+// d coord for left lane
+static double get_dleft(int lane) {
+  double dleft = lane * params::kLaneWidth;
+  return dleft;
+}
+
+// d coord for right lane
+static double get_dright(int lane) {
+  double dright = (lane + 1) * params::kLaneWidth;
+  return dright;
+}
+
+// d coord for center lane
+static double get_dcenter(int lane) {
+  double dcenter = (lane + 0.5) * params::kLaneWidth;
+  // this hack is done to make sure the simulator doesnt report a out of lane. 
+  // I guess it was reported as a bug by some.
+  if (dcenter >= 10) 
+  {
+    dcenter = 9.8; 
+  }
+  return dcenter;
+}
+
 }
 #endif  // HELPERS_H
