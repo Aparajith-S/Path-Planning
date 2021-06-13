@@ -194,5 +194,5 @@ In order to account for the simulator latency, 5 previous points from the trajec
 
 
 ### References:
-1. [Optimal Trajectory Generation for Dynamic Street Scenarios in a Frenet Frame](#https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame)
-2. [Separating Axis Theorem](#https://gamedevelopment.tutsplus.com/tutorials/collision-detection-using-the-separating-axis-theorem--gamedev-169)
+1. ![Optimal Trajectory Generation for Dynamic Street Scenarios in a Frenet Frame](#https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame)
+2. ![Separating Axis Theorem](#https://gamedevelopment.tutsplus.com/tutorials/collision-detection-using-the-separating-axis-theorem--gamedev-169)
